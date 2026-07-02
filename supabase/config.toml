@@ -1,0 +1,14 @@
+project_id = "exjaqywoyparjfzpfeks"
+
+[api]
+enabled = true
+
+[db]
+major_version = 15
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[storage]
+enabled = true
