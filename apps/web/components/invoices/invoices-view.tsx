@@ -20,7 +20,9 @@ import { PageHeader } from "@/components/shared/page-header"
 import { EmptyState } from "@/components/shared/empty-state"
 import { DeleteButton } from "@/components/shared/delete-button"
 
-type InvoiceRow = Invoice & { customers?: { name: string } | null }
+type InvoiceRow = Invoice & {
+  customers?: { name: string; company_name: string | null } | null
+}
 
 export function InvoicesView({ invoices }: { invoices: InvoiceRow[] }) {
   const router = useRouter()
@@ -72,7 +74,8 @@ export function InvoicesView({ invoices }: { invoices: InvoiceRow[] }) {
     const baseUrl = window.location.origin
     const pdfUrl = `${baseUrl}${buildPdfUrl(inv.id)}`
     const message = buildWhatsAppMessage({
-      customerName: inv.customers?.name || "Customer",
+      customerName:
+        inv.customers?.company_name || inv.customers?.name || "Customer",
       invoiceNumber: inv.invoice_number,
       total: formatCurrency(inv.total_amount),
       pdfUrl,
@@ -116,7 +119,9 @@ export function InvoicesView({ invoices }: { invoices: InvoiceRow[] }) {
             {invoices.map((inv) => (
               <TableRow key={inv.id}>
                 <TableCell className="font-medium">{inv.invoice_number}</TableCell>
-                <TableCell>{inv.customers?.name ?? "—"}</TableCell>
+                <TableCell>
+                  {inv.customers?.company_name ?? inv.customers?.name ?? "—"}
+                </TableCell>
                 <TableCell>{inv.date}</TableCell>
                 <TableCell>{formatCurrency(inv.total_amount)}</TableCell>
                 <TableCell>{formatCurrency(inv.paid_amount)}</TableCell>

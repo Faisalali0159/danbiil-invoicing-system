@@ -20,6 +20,18 @@ function money(value: number) {
   }).format(Number(value || 0))
 }
 
+// Standard PDF fonts only support WinAnsi (Latin) characters. Strip anything
+// else (Arabic, emoji, etc.) so drawText never throws and the PDF still renders.
+function winAnsiSafe(value: unknown): string {
+  const text = String(value ?? "")
+  return text
+    .replace(/\t/g, " ")
+    .replace(
+      /[^\u0020-\u007E\u00A0-\u00FF\u0152\u0153\u0160\u0161\u0178\u017D\u017E\u0192\u2013\u2014\u2018\u2019\u201A\u201C\u201D\u201E\u2020\u2021\u2022\u2026\u2030\u2039\u203A\u20AC\u2122\n\r]/g,
+      ""
+    )
+}
+
 async function getLogoBytes(logoUrl?: string | null) {
   if (logoUrl) {
     try {
@@ -65,508 +77,520 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
-  const url = new URL(request.url)
-  const shouldDownload = url.searchParams.get("download") === "1"
-  const supabase = await createClient()
+  try {
+    const { id } = await params
+    const url = new URL(request.url)
+    const shouldDownload = url.searchParams.get("download") === "1"
+    const supabase = await createClient()
 
-  const [
-    { data: quotation, error: quotationError },
-    { data: items },
-    { data: company },
-  ] = await Promise.all([
-    supabase
-      .from("quotations")
-      .select("*, customers(name, phone, address, company_name)")
-      .eq("id", id)
-      .single(),
-    supabase
-      .from("quotation_items")
-      .select("quantity, selling_price, total, products(name)")
-      .eq("quotation_id", id),
-    supabase.from("company_settings").select("*").limit(1).maybeSingle(),
-  ])
+    const [
+      { data: quotation, error: quotationError },
+      { data: items },
+      { data: company },
+    ] = await Promise.all([
+      supabase
+        .from("quotations")
+        .select("*, customers(name, phone, address, company_name)")
+        .eq("id", id)
+        .single(),
+      supabase
+        .from("quotation_items")
+        .select("quantity, selling_price, total, products(name)")
+        .eq("quotation_id", id),
+      supabase.from("company_settings").select("*").limit(1).maybeSingle(),
+    ])
 
-  if (quotationError || !quotation) {
-    return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
-  }
+    if (quotationError || !quotation) {
+      return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
+    }
 
-  const pdfDoc = await PDFDocument.create()
-  const page = pdfDoc.addPage([595, 842]) // A4
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+    const pdfDoc = await PDFDocument.create()
+    const page = pdfDoc.addPage([595, 842]) // A4
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-  const colors = {
-    brand: rgb(10 / 255, 89 / 255, 70 / 255),
-    brandDark: rgb(8 / 255, 68 / 255, 53 / 255),
-    accent: rgb(242 / 255, 249 / 255, 246 / 255),
-    text: rgb(30 / 255, 41 / 255, 59 / 255),
-    muted: rgb(100 / 255, 116 / 255, 139 / 255),
-    border: rgb(226 / 255, 232 / 255, 240 / 255),
-    rowAlt: rgb(248 / 255, 250 / 255, 252 / 255),
-    soft: rgb(241 / 255, 245 / 255, 249 / 255),
-  }
+    const drawText: typeof page.drawText = (text, options) =>
+      page.drawText(winAnsiSafe(text), options)
 
-  const left = 36
-  const right = 559
-  const fullWidth = right - left
+    const colors = {
+      brand: rgb(10 / 255, 89 / 255, 70 / 255),
+      brandDark: rgb(8 / 255, 68 / 255, 53 / 255),
+      accent: rgb(242 / 255, 249 / 255, 246 / 255),
+      text: rgb(30 / 255, 41 / 255, 59 / 255),
+      muted: rgb(100 / 255, 116 / 255, 139 / 255),
+      border: rgb(226 / 255, 232 / 255, 240 / 255),
+      rowAlt: rgb(248 / 255, 250 / 255, 252 / 255),
+      soft: rgb(241 / 255, 245 / 255, 249 / 255),
+    }
 
-  const customer = quotation.customers as
-    | { name?: string; phone?: string; address?: string; company_name?: string }
-    | undefined
+    const left = 36
+    const right = 559
+    const fullWidth = right - left
 
-  const statusText =
-    typeof quotation.status === "string"
-      ? quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1)
-      : "Draft"
+    const customer = quotation.customers as
+      | { name?: string; phone?: string; address?: string; company_name?: string }
+      | undefined
 
-  // Base background card.
-  page.drawRectangle({
-    x: 24,
-    y: 24,
-    width: 547,
-    height: 794,
-    borderColor: colors.border,
-    borderWidth: 1,
-    color: rgb(1, 1, 1),
-  })
+    const statusText =
+      typeof quotation.status === "string"
+        ? quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1)
+        : "Draft"
 
-  // Decorative top stripe.
-  page.drawRectangle({
-    x: 24,
-    y: 808,
-    width: 547,
-    height: 10,
-    color: colors.brandDark,
-  })
+    // Base background card.
+    page.drawRectangle({
+      x: 24,
+      y: 24,
+      width: 547,
+      height: 794,
+      borderColor: colors.border,
+      borderWidth: 1,
+      color: rgb(1, 1, 1),
+    })
 
-  // Logo and company block.
-  page.drawRectangle({
-    x: left,
-    y: 744,
-    width: fullWidth,
-    height: 58,
-    borderColor: colors.border,
-    borderWidth: 1,
-    color: rgb(1, 1, 1),
-  })
+    // Decorative top stripe.
+    page.drawRectangle({
+      x: 24,
+      y: 808,
+      width: 547,
+      height: 10,
+      color: colors.brandDark,
+    })
 
-  const logoBytes = await getLogoBytes(company?.logo_url)
-  if (logoBytes) {
-    const logo = await embedLogoImage(pdfDoc, logoBytes)
-    if (logo) {
-      const maxW = 110
-      const maxH = 44
-      const ratio = Math.min(maxW / logo.width, maxH / logo.height, 1)
-      const drawWidth = logo.width * ratio
-      const drawHeight = logo.height * ratio
-      page.drawImage(logo, {
+    // Logo and company block.
+    page.drawRectangle({
+      x: left,
+      y: 744,
+      width: fullWidth,
+      height: 58,
+      borderColor: colors.border,
+      borderWidth: 1,
+      color: rgb(1, 1, 1),
+    })
+
+    const logoBytes = await getLogoBytes(company?.logo_url)
+    if (logoBytes) {
+      const logo = await embedLogoImage(pdfDoc, logoBytes)
+      if (logo) {
+        const maxW = 110
+        const maxH = 44
+        const ratio = Math.min(maxW / logo.width, maxH / logo.height, 1)
+        const drawWidth = logo.width * ratio
+        const drawHeight = logo.height * ratio
+        page.drawImage(logo, {
+          x: left + 12,
+          y: 751 + (44 - drawHeight) / 2,
+          width: drawWidth,
+          height: drawHeight,
+        })
+      }
+    }
+
+    const companyName = company?.company_name || "Danbiil Distributor"
+    drawText(companyName, {
+      x: left + 140,
+      y: 779,
+      size: 16,
+      font: fontBold,
+      color: colors.brand,
+    })
+    if (company?.address) {
+      drawText(`${company.address}`, {
+        x: left + 140,
+        y: 764,
+        size: 9,
+        font,
+        color: colors.muted,
+      })
+    }
+    if (company?.phone) {
+      drawText(`Phone: ${company.phone}`, {
+        x: left + 140,
+        y: 750,
+        size: 9,
+        font,
+        color: colors.muted,
+      })
+    }
+    if (company?.email) {
+      drawText(`Email: ${company.email}`, {
+        x: 410,
+        y: 750,
+        size: 9,
+        font,
+        color: colors.muted,
+      })
+    }
+
+    // Main quotation banner.
+    page.drawRectangle({
+      x: left,
+      y: 682,
+      width: fullWidth,
+      height: 48,
+      color: colors.brandDark,
+    })
+    page.drawRectangle({
+      x: left,
+      y: 682,
+      width: 150,
+      height: 48,
+      color: colors.brand,
+    })
+    drawText("QUOTATION", {
+      x: left + 16,
+      y: 699,
+      size: 18,
+      font: fontBold,
+      color: colors.accent,
+    })
+    drawText(`Quotation #: ${quotation.quotation_number}`, {
+      x: 350,
+      y: 705,
+      size: 11,
+      font: fontBold,
+      color: colors.accent,
+    })
+    drawText(`Date: ${quotation.date}`, {
+      x: 350,
+      y: 690,
+      size: 10,
+      font,
+      color: colors.accent,
+    })
+    drawText(`Status: ${statusText}`, {
+      x: 455,
+      y: 690,
+      size: 10,
+      font,
+      color: colors.accent,
+    })
+
+    // Quote-for card.
+    page.drawRectangle({
+      x: left,
+      y: 604,
+      width: 260,
+      height: 62,
+      borderColor: colors.border,
+      borderWidth: 1,
+      color: colors.soft,
+    })
+    drawText("Quotation For", {
+      x: left + 12,
+      y: 646,
+      size: 11,
+      font: fontBold,
+      color: colors.brand,
+    })
+    drawText(customer?.company_name || customer?.name || "Customer", {
+      x: left + 12,
+      y: 630,
+      size: 11,
+      font,
+      color: colors.text,
+    })
+    if (customer?.phone) {
+      drawText(`Phone: ${customer.phone}`, {
         x: left + 12,
-        y: 751 + (44 - drawHeight) / 2,
-        width: drawWidth,
-        height: drawHeight,
+        y: 616,
+        size: 9,
+        font,
+        color: colors.muted,
       })
     }
-  }
-
-  const companyName = company?.company_name || "Danbiil Distributor"
-  page.drawText(companyName, {
-    x: left + 140,
-    y: 779,
-    size: 16,
-    font: fontBold,
-    color: colors.brand,
-  })
-  if (company?.address) {
-    page.drawText(`${company.address}`, {
-      x: left + 140,
-      y: 764,
-      size: 9,
-      font,
-      color: colors.muted,
-    })
-  }
-  if (company?.phone) {
-    page.drawText(`Phone: ${company.phone}`, {
-      x: left + 140,
-      y: 750,
-      size: 9,
-      font,
-      color: colors.muted,
-    })
-  }
-  if (company?.email) {
-    page.drawText(`Email: ${company.email}`, {
-      x: 410,
-      y: 750,
-      size: 9,
-      font,
-      color: colors.muted,
-    })
-  }
-
-  // Main quotation banner.
-  page.drawRectangle({
-    x: left,
-    y: 682,
-    width: fullWidth,
-    height: 48,
-    color: colors.brandDark,
-  })
-  page.drawRectangle({
-    x: left,
-    y: 682,
-    width: 150,
-    height: 48,
-    color: colors.brand,
-  })
-  page.drawText("QUOTATION", {
-    x: left + 16,
-    y: 699,
-    size: 18,
-    font: fontBold,
-    color: colors.accent,
-  })
-  page.drawText(`Quotation #: ${quotation.quotation_number}`, {
-    x: 350,
-    y: 705,
-    size: 11,
-    font: fontBold,
-    color: colors.accent,
-  })
-  page.drawText(`Date: ${quotation.date}`, {
-    x: 350,
-    y: 690,
-    size: 10,
-    font,
-    color: colors.accent,
-  })
-  page.drawText(`Status: ${statusText}`, {
-    x: 455,
-    y: 690,
-    size: 10,
-    font,
-    color: colors.accent,
-  })
-
-  // Quote-for card.
-  page.drawRectangle({
-    x: left,
-    y: 604,
-    width: 260,
-    height: 62,
-    borderColor: colors.border,
-    borderWidth: 1,
-    color: colors.soft,
-  })
-  page.drawText("Quotation For", {
-    x: left + 12,
-    y: 646,
-    size: 11,
-    font: fontBold,
-    color: colors.brand,
-  })
-  page.drawText(customer?.name || "Customer", {
-    x: left + 12,
-    y: 630,
-    size: 11,
-    font,
-    color: colors.text,
-  })
-  if (customer?.phone) {
-    page.drawText(`Phone: ${customer.phone}`, {
-      x: left + 12,
-      y: 616,
-      size: 9,
-      font,
-      color: colors.muted,
-    })
-  }
-  if (customer?.address) {
-    page.drawText(`Address: ${customer.address}`, {
-      x: left + 12,
-      y: 603,
-      size: 9,
-      font,
-      color: colors.muted,
-    })
-  }
-
-  // Validity card.
-  page.drawRectangle({
-    x: 315,
-    y: 604,
-    width: 244,
-    height: 62,
-    borderColor: colors.border,
-    borderWidth: 1,
-    color: rgb(1, 1, 1),
-  })
-  page.drawText("Quotation Summary", {
-    x: 327,
-    y: 646,
-    size: 11,
-    font: fontBold,
-    color: colors.brand,
-  })
-  page.drawText(`Valid Until: ${quotation.valid_until ?? "—"}`, {
-    x: 327,
-    y: 628,
-    size: 10,
-    font,
-    color: colors.text,
-  })
-  page.drawText(`Total: ${money(quotation.total_amount)}`, {
-    x: 327,
-    y: 612,
-    size: 10,
-    font,
-    color: colors.text,
-  })
-
-  const startY = 570
-  page.drawRectangle({
-    x: left,
-    y: startY,
-    width: fullWidth,
-    height: 26,
-    color: colors.brandDark,
-  })
-  page.drawText("Item", {
-    x: left + 10,
-    y: startY + 9,
-    size: 10,
-    font: fontBold,
-    color: colors.accent,
-  })
-  page.drawText("Qty", {
-    x: 318,
-    y: startY + 9,
-    size: 10,
-    font: fontBold,
-    color: colors.accent,
-  })
-  page.drawText("Price", {
-    x: 390,
-    y: startY + 9,
-    size: 10,
-    font: fontBold,
-    color: colors.accent,
-  })
-  page.drawText("Total", {
-    x: 495,
-    y: startY + 9,
-    size: 10,
-    font: fontBold,
-    color: colors.accent,
-  })
-
-  let y = startY - 18
-  const rows = (items ?? []) as QuotationItemRow[]
-  rows.slice(0, 12).forEach((item, index) => {
-    if (index % 2 === 0) {
-      page.drawRectangle({
-        x: left,
-        y: y - 3,
-        width: fullWidth,
-        height: 22,
-        color: colors.rowAlt,
+    if (customer?.address) {
+      drawText(`Address: ${customer.address}`, {
+        x: left + 12,
+        y: 603,
+        size: 9,
+        font,
+        color: colors.muted,
       })
     }
-    page.drawText(getItemName(item), {
+
+    // Validity card.
+    page.drawRectangle({
+      x: 315,
+      y: 604,
+      width: 244,
+      height: 62,
+      borderColor: colors.border,
+      borderWidth: 1,
+      color: rgb(1, 1, 1),
+    })
+    drawText("Quotation Summary", {
+      x: 327,
+      y: 646,
+      size: 11,
+      font: fontBold,
+      color: colors.brand,
+    })
+    drawText(`Valid Until: ${quotation.valid_until ?? "—"}`, {
+      x: 327,
+      y: 628,
+      size: 10,
+      font,
+      color: colors.text,
+    })
+    drawText(`Total: ${money(quotation.total_amount)}`, {
+      x: 327,
+      y: 612,
+      size: 10,
+      font,
+      color: colors.text,
+    })
+
+    const startY = 570
+    page.drawRectangle({
+      x: left,
+      y: startY,
+      width: fullWidth,
+      height: 26,
+      color: colors.brandDark,
+    })
+    drawText("Item", {
       x: left + 10,
-      y,
+      y: startY + 9,
       size: 10,
-      font,
-      color: colors.text,
+      font: fontBold,
+      color: colors.accent,
     })
-    page.drawText(String(item.quantity), {
-      x: 322,
-      y,
+    drawText("Qty", {
+      x: 318,
+      y: startY + 9,
       size: 10,
-      font,
-      color: colors.text,
+      font: fontBold,
+      color: colors.accent,
     })
-    page.drawText(money(item.selling_price), {
+    drawText("Price", {
       x: 390,
-      y,
+      y: startY + 9,
       size: 10,
-      font,
-      color: colors.text,
+      font: fontBold,
+      color: colors.accent,
     })
-    page.drawText(money(item.total), {
+    drawText("Total", {
       x: 495,
-      y,
+      y: startY + 9,
       size: 10,
-      font,
-      color: colors.text,
+      font: fontBold,
+      color: colors.accent,
     })
-    y -= 22
-  })
 
-  const summaryTop = y - 14
+    let y = startY - 18
+    const rows = (items ?? []) as QuotationItemRow[]
+    rows.slice(0, 12).forEach((item, index) => {
+      if (index % 2 === 0) {
+        page.drawRectangle({
+          x: left,
+          y: y - 3,
+          width: fullWidth,
+          height: 22,
+          color: colors.rowAlt,
+        })
+      }
+      drawText(getItemName(item), {
+        x: left + 10,
+        y,
+        size: 10,
+        font,
+        color: colors.text,
+      })
+      drawText(String(item.quantity), {
+        x: 322,
+        y,
+        size: 10,
+        font,
+        color: colors.text,
+      })
+      drawText(money(item.selling_price), {
+        x: 390,
+        y,
+        size: 10,
+        font,
+        color: colors.text,
+      })
+      drawText(money(item.total), {
+        x: 495,
+        y,
+        size: 10,
+        font,
+        color: colors.text,
+      })
+      y -= 22
+    })
 
-  // Payment terms + notes card.
-  page.drawRectangle({
-    x: left,
-    y: summaryTop - 116,
-    width: 250,
-    height: 116,
-    borderColor: colors.border,
-    borderWidth: 1,
-    color: colors.soft,
-  })
-  page.drawText("Payment Terms", {
-    x: left + 12,
-    y: summaryTop - 16,
-    size: 10,
-    font: fontBold,
-    color: colors.brand,
-  })
-  page.drawText(quotation.payment_terms || "Not specified.", {
-    x: left + 12,
-    y: summaryTop - 32,
-    size: 9,
-    font,
-    color: colors.text,
-    maxWidth: 226,
-    lineHeight: 12,
-  })
-  page.drawText("Notes", {
-    x: left + 12,
-    y: summaryTop - 70,
-    size: 10,
-    font: fontBold,
-    color: colors.brand,
-  })
-  page.drawText(
-    quotation.notes || "This quotation is not an invoice and is valid until the date shown.",
-    {
+    const summaryTop = y - 14
+
+    // Payment terms + notes card.
+    page.drawRectangle({
+      x: left,
+      y: summaryTop - 116,
+      width: 250,
+      height: 116,
+      borderColor: colors.border,
+      borderWidth: 1,
+      color: colors.soft,
+    })
+    drawText("Payment Terms", {
       x: left + 12,
-      y: summaryTop - 86,
+      y: summaryTop - 16,
+      size: 10,
+      font: fontBold,
+      color: colors.brand,
+    })
+    drawText(quotation.payment_terms || "Not specified.", {
+      x: left + 12,
+      y: summaryTop - 32,
       size: 9,
       font,
       color: colors.text,
       maxWidth: 226,
       lineHeight: 12,
-    }
-  )
+    })
+    drawText("Notes", {
+      x: left + 12,
+      y: summaryTop - 70,
+      size: 10,
+      font: fontBold,
+      color: colors.brand,
+    })
+    drawText(
+      quotation.notes || "This quotation is not an invoice and is valid until the date shown.",
+      {
+        x: left + 12,
+        y: summaryTop - 86,
+        size: 9,
+        font,
+        color: colors.text,
+        maxWidth: 226,
+        lineHeight: 12,
+      }
+    )
 
-  page.drawRectangle({
-    x: 332,
-    y: summaryTop - 116,
-    width: 227,
-    height: 116,
-    borderColor: colors.border,
-    borderWidth: 1,
-    color: rgb(1, 1, 1),
-  })
-  page.drawText("Subtotal", {
-    x: 344,
-    y: summaryTop - 16,
-    size: 10,
-    font,
-    color: colors.text,
-  })
-  page.drawText(money(quotation.subtotal), {
-    x: 488,
-    y: summaryTop - 16,
-    size: 10,
-    font,
-    color: colors.text,
-  })
-  page.drawText("Discount", {
-    x: 344,
-    y: summaryTop - 34,
-    size: 10,
-    font,
-    color: colors.text,
-  })
-  page.drawText(money(quotation.discount), {
-    x: 488,
-    y: summaryTop - 34,
-    size: 10,
-    font,
-    color: colors.text,
-  })
-  page.drawText("VAT", {
-    x: 344,
-    y: summaryTop - 52,
-    size: 10,
-    font,
-    color: colors.text,
-  })
-  page.drawText(money(quotation.vat_amount), {
-    x: 488,
-    y: summaryTop - 52,
-    size: 10,
-    font,
-    color: colors.text,
-  })
-  page.drawText("Delivery", {
-    x: 344,
-    y: summaryTop - 70,
-    size: 10,
-    font,
-    color: colors.text,
-  })
-  page.drawText(money(quotation.delivery_cost), {
-    x: 488,
-    y: summaryTop - 70,
-    size: 10,
-    font,
-    color: colors.text,
-  })
-  page.drawRectangle({
-    x: 338,
-    y: summaryTop - 108,
-    width: 215,
-    height: 24,
-    color: colors.brand,
-  })
-  page.drawText("Quotation Total", {
-    x: 346,
-    y: summaryTop - 98,
-    size: 12,
-    font: fontBold,
-    color: colors.accent,
-  })
-  page.drawText(money(quotation.total_amount), {
-    x: 484,
-    y: summaryTop - 98,
-    size: 12,
-    font: fontBold,
-    color: colors.accent,
-  })
+    page.drawRectangle({
+      x: 332,
+      y: summaryTop - 116,
+      width: 227,
+      height: 116,
+      borderColor: colors.border,
+      borderWidth: 1,
+      color: rgb(1, 1, 1),
+    })
+    drawText("Subtotal", {
+      x: 344,
+      y: summaryTop - 16,
+      size: 10,
+      font,
+      color: colors.text,
+    })
+    drawText(money(quotation.subtotal), {
+      x: 488,
+      y: summaryTop - 16,
+      size: 10,
+      font,
+      color: colors.text,
+    })
+    drawText("Discount", {
+      x: 344,
+      y: summaryTop - 34,
+      size: 10,
+      font,
+      color: colors.text,
+    })
+    drawText(money(quotation.discount), {
+      x: 488,
+      y: summaryTop - 34,
+      size: 10,
+      font,
+      color: colors.text,
+    })
+    drawText("VAT", {
+      x: 344,
+      y: summaryTop - 52,
+      size: 10,
+      font,
+      color: colors.text,
+    })
+    drawText(money(quotation.vat_amount), {
+      x: 488,
+      y: summaryTop - 52,
+      size: 10,
+      font,
+      color: colors.text,
+    })
+    drawText("Delivery", {
+      x: 344,
+      y: summaryTop - 70,
+      size: 10,
+      font,
+      color: colors.text,
+    })
+    drawText(money(quotation.delivery_cost), {
+      x: 488,
+      y: summaryTop - 70,
+      size: 10,
+      font,
+      color: colors.text,
+    })
+    page.drawRectangle({
+      x: 338,
+      y: summaryTop - 108,
+      width: 215,
+      height: 24,
+      color: colors.brand,
+    })
+    drawText("Quotation Total", {
+      x: 346,
+      y: summaryTop - 98,
+      size: 12,
+      font: fontBold,
+      color: colors.accent,
+    })
+    drawText(money(quotation.total_amount), {
+      x: 484,
+      y: summaryTop - 98,
+      size: 12,
+      font: fontBold,
+      color: colors.accent,
+    })
 
-  page.drawRectangle({
-    x: 24,
-    y: 24,
-    width: 547,
-    height: 18,
-    color: colors.brandDark,
-  })
-  page.drawText("Thank you for the opportunity to quote.", {
-    x: left,
-    y: 30,
-    size: 9,
-    font,
-    color: colors.accent,
-  })
-  page.drawText("Generated by Danbiil Invoice Manager", {
-    x: 420,
-    y: 30,
-    size: 8,
-    font,
-    color: colors.accent,
-  })
+    page.drawRectangle({
+      x: 24,
+      y: 24,
+      width: 547,
+      height: 18,
+      color: colors.brandDark,
+    })
+    drawText("Thank you for the opportunity to quote.", {
+      x: left,
+      y: 30,
+      size: 9,
+      font,
+      color: colors.accent,
+    })
+    drawText("Generated by Danbiil Invoice Manager", {
+      x: 420,
+      y: 30,
+      size: 8,
+      font,
+      color: colors.accent,
+    })
 
-  const pdfBytes = await pdfDoc.save()
-  return new NextResponse(Buffer.from(pdfBytes), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `${shouldDownload ? "attachment" : "inline"}; filename="${quotation.quotation_number}-quotation.pdf"`,
-      "Cache-Control": "no-store",
-    },
-  })
+    const pdfBytes = await pdfDoc.save()
+    return new NextResponse(Buffer.from(pdfBytes), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `${shouldDownload ? "attachment" : "inline"}; filename="${quotation.quotation_number}-quotation.pdf"`,
+        "Cache-Control": "no-store",
+      },
+    })
+  }  catch (error) {
+    console.error("Failed to generate quotation PDF", error)
+    const detail = error instanceof Error ? error.message : "Unknown error"
+    return NextResponse.json(
+      { error: "Failed to generate quotation PDF", detail },
+      { status: 500 }
+    )
+  }
 }

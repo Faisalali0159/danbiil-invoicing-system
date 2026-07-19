@@ -22,7 +22,9 @@ import { EmptyState } from "@/components/shared/empty-state"
 import { DeleteButton } from "@/components/shared/delete-button"
 import { ConvertQuotationButton } from "./convert-quotation-button"
 
-type QuotationRow = Quotation & { customers?: { name: string } | null }
+type QuotationRow = Quotation & {
+  customers?: { name: string; company_name: string | null } | null
+}
 
 const STATUS_BADGE: Record<
   QuotationStatus,
@@ -54,7 +56,7 @@ export function QuotationsView({ quotations }: { quotations: QuotationRow[] }) {
     const baseUrl = window.location.origin
     const pdfUrl = `${baseUrl}/api/quotations/${q.id}/pdf`
     const lines = [
-      `Dear ${q.customers?.name || "Customer"},`,
+      `Dear ${q.customers?.company_name || q.customers?.name || "Customer"},`,
       "",
       `Your quotation #${q.quotation_number}`,
       `Total: ${formatCurrency(q.total_amount)}`,
@@ -105,7 +107,9 @@ export function QuotationsView({ quotations }: { quotations: QuotationRow[] }) {
                 <TableCell className="font-medium">
                   {q.quotation_number}
                 </TableCell>
-                <TableCell>{q.customers?.name ?? "—"}</TableCell>
+                <TableCell>
+                  {q.customers?.company_name ?? q.customers?.name ?? "—"}
+                </TableCell>
                 <TableCell>{q.date}</TableCell>
                 <TableCell>{q.valid_until ?? "—"}</TableCell>
                 <TableCell>{formatCurrency(q.total_amount)}</TableCell>

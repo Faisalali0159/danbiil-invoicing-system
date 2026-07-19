@@ -44,7 +44,7 @@ export function ProductsView({
   suppliers,
   productSourceById,
 }: {
-  products: (Product & { suppliers?: { name: string } | null })[]
+  products: (Product & { suppliers?: { name: string; company_name: string | null } | null })[]
   categories: Category[]
   suppliers: Supplier[]
   productSourceById: Record<string, "purchased" | "borrowed" | "both" | "manual">
@@ -149,7 +149,9 @@ export function ProductsView({
               return (
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{p.name}</TableCell>
-                  <TableCell>{p.suppliers?.name ?? "—"}</TableCell>
+                  <TableCell>
+                    {p.suppliers?.company_name ?? p.suppliers?.name ?? "—"}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline">
                       {productSourceById[p.id] === "both"
@@ -211,7 +213,11 @@ export function ProductsView({
             </div>
             <div className="grid gap-2">
               <Label>Category</Label>
-              <Select value={categoryId} onValueChange={onSelectValue(setCategoryId)}>
+              <Select
+                value={categoryId}
+                onValueChange={onSelectValue(setCategoryId)}
+                items={categories.map((c) => ({ value: c.id, label: c.name }))}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
@@ -224,13 +230,22 @@ export function ProductsView({
             </div>
             <div className="grid gap-2">
               <Label>Supplier *</Label>
-              <Select value={supplierId} onValueChange={onSelectValue(setSupplierId)}>
+              <Select
+                value={supplierId}
+                onValueChange={onSelectValue(setSupplierId)}
+                items={suppliers.map((s) => ({
+                  value: s.id,
+                  label: s.company_name || s.name,
+                }))}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent>
                   {suppliers.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.company_name || s.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

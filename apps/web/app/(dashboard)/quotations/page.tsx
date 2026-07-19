@@ -5,7 +5,7 @@ export default async function QuotationsPage() {
   const supabase = await createClient()
   const { data } = await supabase
     .from("quotations")
-    .select("*, customers(name)")
+    .select("*, customers(name, company_name)")
     .order("created_at", { ascending: false })
 
   return <QuotationsView quotations={data ?? []} />

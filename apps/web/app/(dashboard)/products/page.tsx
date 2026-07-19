@@ -4,7 +4,7 @@ import { ProductsView } from "@/components/products/products-view"
 export default async function ProductsPage() {
   const supabase = await createClient()
   const [products, categories, suppliers, purchaseItems, borrowedItems] = await Promise.all([
-    supabase.from("products").select("*, suppliers(name)").order("name"),
+    supabase.from("products").select("*, suppliers(name, company_name)").order("name"),
     supabase.from("categories").select("*").order("name"),
     supabase.from("suppliers").select("*").order("name"),
     supabase.from("purchase_items").select("product_id"),

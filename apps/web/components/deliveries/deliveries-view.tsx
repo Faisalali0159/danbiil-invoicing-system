@@ -159,7 +159,14 @@ export function DeliveriesView({
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="grid gap-2">
               <Label>Invoice *</Label>
-              <Select value={invoiceId} onValueChange={onSelectValue(setInvoiceId)}>
+              <Select
+                value={invoiceId}
+                onValueChange={onSelectValue(setInvoiceId)}
+                items={invoices.map((inv) => ({
+                  value: inv.id,
+                  label: inv.invoice_number,
+                }))}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select invoice" />
                 </SelectTrigger>

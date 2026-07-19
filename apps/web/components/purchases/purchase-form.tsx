@@ -101,13 +101,19 @@ export function PurchaseForm({
               setSupplierId(value)
               setItems([])
             })}
+            items={suppliers.map((s) => ({
+              value: s.id,
+              label: s.company_name || s.name,
+            }))}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select supplier" />
             </SelectTrigger>
             <SelectContent>
               {suppliers.map((s) => (
-                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                <SelectItem key={s.id} value={s.id}>
+                  {s.company_name || s.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

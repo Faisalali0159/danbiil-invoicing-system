@@ -172,13 +172,22 @@ export function QuotationForm({
         </div>
         <div className="grid gap-2">
           <Label>Customer *</Label>
-          <Select value={customerId} onValueChange={onSelectValue(setCustomerId)}>
+          <Select
+            value={customerId}
+            onValueChange={onSelectValue(setCustomerId)}
+            items={customers.map((c) => ({
+              value: c.id,
+              label: c.company_name || c.name,
+            }))}
+          >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select customer" />
             </SelectTrigger>
             <SelectContent>
               {customers.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                <SelectItem key={c.id} value={c.id}>
+                  {c.company_name || c.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -218,6 +227,7 @@ export function QuotationForm({
                   <Select
                     value={item.product_id}
                     onValueChange={onSelectValue((v) => onProductChange(index, v))}
+                    items={products.map((p) => ({ value: p.id, label: p.name }))}
                   >
                     <SelectTrigger className="w-full min-w-40">
                       <SelectValue />

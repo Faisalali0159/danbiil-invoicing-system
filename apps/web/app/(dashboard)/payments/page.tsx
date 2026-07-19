@@ -7,7 +7,7 @@ export default async function PaymentsPage() {
     await Promise.all([
       supabase
         .from("payments")
-        .select("*, customers(name), suppliers(name), invoices(invoice_number), purchases(invoice_number)")
+        .select("*, customers(name, company_name), suppliers(name, company_name), invoices(invoice_number), purchases(invoice_number)")
         .order("payment_date", { ascending: false }),
       supabase.from("customers").select("*").order("name"),
       supabase.from("suppliers").select("*").order("name"),

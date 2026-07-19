@@ -53,7 +53,15 @@ export function QuotationStatusSelect({
 
   return (
     <div className="flex flex-col gap-1">
-      <Select value={status} onValueChange={handleChange} disabled={loading}>
+      <Select
+        value={status}
+        onValueChange={handleChange}
+        disabled={loading}
+        items={EDITABLE_STATUSES.map((s) => ({
+          value: s,
+          label: s.charAt(0).toUpperCase() + s.slice(1),
+        }))}
+      >
         <SelectTrigger size="sm" className="w-32">
           <SelectValue />
         </SelectTrigger>

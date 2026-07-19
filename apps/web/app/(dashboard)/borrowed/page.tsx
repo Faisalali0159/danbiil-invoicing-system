@@ -6,7 +6,7 @@ export default async function BorrowedPage() {
   const [borrowed, suppliers, products] = await Promise.all([
     supabase
       .from("borrowed_products")
-      .select("*, suppliers(name), products(name)")
+      .select("*, suppliers(name, company_name), products(name)")
       .order("borrow_date", { ascending: false }),
     supabase.from("suppliers").select("*").order("name"),
     supabase.from("products").select("*").order("name"),

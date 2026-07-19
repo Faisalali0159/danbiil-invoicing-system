@@ -26,7 +26,7 @@ type PurchaseRow = {
   paid_amount: number
   remaining_balance: number
   status: string
-  suppliers?: { name: string } | null
+  suppliers?: { name: string; company_name: string | null } | null
 }
 
 export function PurchasesView({ purchases }: { purchases: PurchaseRow[] }) {
@@ -62,7 +62,9 @@ export function PurchasesView({ purchases }: { purchases: PurchaseRow[] }) {
             {purchases.map((p) => (
               <TableRow key={p.id}>
                 <TableCell className="font-medium">{p.invoice_number}</TableCell>
-                <TableCell>{p.suppliers?.name ?? "—"}</TableCell>
+                <TableCell>
+                  {p.suppliers?.company_name ?? p.suppliers?.name ?? "—"}
+                </TableCell>
                 <TableCell>{p.purchase_date}</TableCell>
                 <TableCell>{formatCurrency(p.total_amount)}</TableCell>
                 <TableCell>

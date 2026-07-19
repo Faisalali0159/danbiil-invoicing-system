@@ -44,7 +44,7 @@ type BorrowedRow = {
   due_date: string | null
   payment_status: string
   paid_amount: number
-  suppliers?: { name: string } | null
+  suppliers?: { name: string; company_name: string | null } | null
   products?: { name: string } | null
 }
 
@@ -114,7 +114,9 @@ export function BorrowedView({
           <TableBody>
             {items.map((row) => (
               <TableRow key={row.id}>
-                <TableCell>{row.suppliers?.name ?? "—"}</TableCell>
+                <TableCell>
+                  {row.suppliers?.company_name ?? row.suppliers?.name ?? "—"}
+                </TableCell>
                 <TableCell>{row.products?.name ?? "—"}</TableCell>
                 <TableCell>{row.quantity}</TableCell>
                 <TableCell>{formatCurrency(row.cost)}</TableCell>
@@ -150,20 +152,30 @@ export function BorrowedView({
                   setSupplierId(value)
                   setProductId("")
                 })}
+                items={suppliers.map((s) => ({
+                  value: s.id,
+                  label: s.company_name || s.name,
+                }))}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent>
                   {suppliers.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.company_name || s.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="grid gap-2">
               <Label>Product *</Label>
-              <Select value={productId} onValueChange={onSelectValue(setProductId)}>
+              <Select
+                value={productId}
+                onValueChange={onSelectValue(setProductId)}
+                items={products.map((p) => ({ value: p.id, label: p.name }))}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select product" />
                 </SelectTrigger>

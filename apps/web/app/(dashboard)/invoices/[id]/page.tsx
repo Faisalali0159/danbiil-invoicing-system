@@ -33,7 +33,7 @@ export default async function InvoiceDetailsPage({
   const [{ data: invoice, error: invoiceError }, { data: items }] = await Promise.all([
     supabase
       .from("invoices")
-      .select("*, customers(name, phone, address)")
+      .select("*, customers(name, phone, address, company_name)")
       .eq("id", id)
       .single(),
     supabase
@@ -86,7 +86,11 @@ export default async function InvoiceDetailsPage({
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-lg border p-4">
           <p className="text-sm text-muted-foreground">Customer</p>
-          <p className="font-medium">{invoice.customers?.name ?? "Customer"}</p>
+          <p className="font-medium">
+            {invoice.customers?.company_name ??
+              invoice.customers?.name ??
+              "Customer"}
+          </p>
           <p className="text-sm text-muted-foreground">{invoice.customers?.phone ?? "—"}</p>
           <p className="text-sm text-muted-foreground">{invoice.customers?.address ?? "—"}</p>
         </div>

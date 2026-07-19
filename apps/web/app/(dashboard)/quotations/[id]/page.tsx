@@ -35,7 +35,7 @@ export default async function QuotationDetailsPage({
     await Promise.all([
       supabase
         .from("quotations")
-        .select("*, customers(name, phone, address)")
+        .select("*, customers(name, phone, address, company_name)")
         .eq("id", id)
         .single(),
       supabase
@@ -113,7 +113,11 @@ export default async function QuotationDetailsPage({
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-lg border p-4">
           <p className="text-sm text-muted-foreground">Customer</p>
-          <p className="font-medium">{quotation.customers?.name ?? "Customer"}</p>
+          <p className="font-medium">
+            {quotation.customers?.company_name ??
+              quotation.customers?.name ??
+              "Customer"}
+          </p>
           <p className="text-sm text-muted-foreground">
             {quotation.customers?.phone ?? "—"}
           </p>

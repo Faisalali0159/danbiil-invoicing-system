@@ -42,8 +42,8 @@ type PaymentRow = {
   amount: number
   payment_date: string
   notes: string | null
-  customers?: { name: string } | null
-  suppliers?: { name: string } | null
+  customers?: { name: string; company_name: string | null } | null
+  suppliers?: { name: string; company_name: string | null } | null
   invoices?: { invoice_number: string } | null
   purchases?: { invoice_number: string } | null
 }
@@ -128,7 +128,11 @@ export function PaymentsView({
                   <Badge variant="outline">{p.payment_type.replace("_", " ")}</Badge>
                 </TableCell>
                 <TableCell>
-                  {p.customers?.name ?? p.suppliers?.name ?? "—"}
+                  {p.customers?.company_name ??
+                    p.customers?.name ??
+                    p.suppliers?.company_name ??
+                    p.suppliers?.name ??
+                    "—"}
                 </TableCell>
                 <TableCell>
                   {p.invoices?.invoice_number ?? p.purchases?.invoice_number ?? "—"}
@@ -162,6 +166,10 @@ export function PaymentsView({
                 onValueChange={(v) =>
                   setPaymentType(v as "customer_payment" | "supplier_payment")
                 }
+                items={[
+                  { value: "customer_payment", label: "Customer Payment" },
+                  { value: "supplier_payment", label: "Supplier Payment" },
+                ]}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -177,20 +185,36 @@ export function PaymentsView({
               <>
                 <div className="grid gap-2">
                   <Label>Customer *</Label>
-                  <Select value={customerId} onValueChange={onSelectValue(setCustomerId)}>
+                  <Select
+                    value={customerId}
+                    onValueChange={onSelectValue(setCustomerId)}
+                    items={customers.map((c) => ({
+                      value: c.id,
+                      label: c.company_name || c.name,
+                    }))}
+                  >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select customer" />
                     </SelectTrigger>
                     <SelectContent>
                       {customers.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.company_name || c.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-2">
                   <Label>Link Invoice (optional)</Label>
-                  <Select value={invoiceId} onValueChange={onSelectValue(setInvoiceId)}>
+                  <Select
+                    value={invoiceId}
+                    onValueChange={onSelectValue(setInvoiceId)}
+                    items={invoices.map((inv) => ({
+                      value: inv.id,
+                      label: inv.invoice_number,
+                    }))}
+                  >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select invoice" />
                     </SelectTrigger>
@@ -208,20 +232,36 @@ export function PaymentsView({
               <>
                 <div className="grid gap-2">
                   <Label>Supplier *</Label>
-                  <Select value={supplierId} onValueChange={onSelectValue(setSupplierId)}>
+                  <Select
+                    value={supplierId}
+                    onValueChange={onSelectValue(setSupplierId)}
+                    items={suppliers.map((s) => ({
+                      value: s.id,
+                      label: s.company_name || s.name,
+                    }))}
+                  >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select supplier" />
                     </SelectTrigger>
                     <SelectContent>
                       {suppliers.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.company_name || s.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-2">
                   <Label>Link Purchase (optional)</Label>
-                  <Select value={purchaseId} onValueChange={onSelectValue(setPurchaseId)}>
+                  <Select
+                    value={purchaseId}
+                    onValueChange={onSelectValue(setPurchaseId)}
+                    items={purchases.map((p) => ({
+                      value: p.id,
+                      label: p.invoice_number,
+                    }))}
+                  >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select purchase" />
                     </SelectTrigger>
