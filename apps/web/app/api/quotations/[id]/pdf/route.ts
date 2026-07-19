@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 
-type InvoiceItemRow = {
+type QuotationItemRow = {
   quantity: number
   selling_price: number
   total: number
@@ -32,9 +32,8 @@ async function getLogoBytes(logoUrl?: string | null) {
     }
   }
 
-  const fallbackPath =
-    process.env.COMPANY_LOGO_PATH ||
-    "/Users/faisalali/.cursor/projects/Users-faisalali-projects-danbiil-invoice-manager/assets/2-413a02c2-2a2a-48ca-aec4-106a6bf6c045.png"
+  const fallbackPath = process.env.COMPANY_LOGO_PATH
+  if (!fallbackPath) return null
 
   try {
     return await readFile(fallbackPath)
@@ -43,7 +42,7 @@ async function getLogoBytes(logoUrl?: string | null) {
   }
 }
 
-function getItemName(item: InvoiceItemRow) {
+function getItemName(item: QuotationItemRow) {
   if (Array.isArray(item.products)) {
     return item.products[0]?.name || "Item"
   }
@@ -69,26 +68,27 @@ export async function GET(
   const { id } = await params
   const url = new URL(request.url)
   const shouldDownload = url.searchParams.get("download") === "1"
-  const template = url.searchParams.get("template") === "receipt" ? "receipt" : "invoice"
-  const isReceipt = template === "receipt"
   const supabase = await createClient()
 
-  const [{ data: invoice, error: invoiceError }, { data: items }, { data: company }] =
-    await Promise.all([
-      supabase
-        .from("invoices")
-        .select("*, customers(name, phone, address, company_name)")
-        .eq("id", id)
-        .single(),
-      supabase
-        .from("invoice_items")
-        .select("quantity, selling_price, total, products(name)")
-        .eq("invoice_id", id),
-      supabase.from("company_settings").select("*").limit(1).maybeSingle(),
-    ])
+  const [
+    { data: quotation, error: quotationError },
+    { data: items },
+    { data: company },
+  ] = await Promise.all([
+    supabase
+      .from("quotations")
+      .select("*, customers(name, phone, address, company_name)")
+      .eq("id", id)
+      .single(),
+    supabase
+      .from("quotation_items")
+      .select("quantity, selling_price, total, products(name)")
+      .eq("quotation_id", id),
+    supabase.from("company_settings").select("*").limit(1).maybeSingle(),
+  ])
 
-  if (invoiceError || !invoice) {
-    return NextResponse.json({ error: "Invoice not found" }, { status: 404 })
+  if (quotationError || !quotation) {
+    return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
   }
 
   const pdfDoc = await PDFDocument.create()
@@ -111,15 +111,14 @@ export async function GET(
   const right = 559
   const fullWidth = right - left
 
-  const customer = invoice.customers as
+  const customer = quotation.customers as
     | { name?: string; phone?: string; address?: string; company_name?: string }
     | undefined
 
   const statusText =
-    typeof invoice.payment_status === "string"
-      ? invoice.payment_status.charAt(0).toUpperCase() +
-        invoice.payment_status.slice(1)
-      : "Unpaid"
+    typeof quotation.status === "string"
+      ? quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1)
+      : "Draft"
 
   // Base background card.
   page.drawRectangle({
@@ -206,7 +205,7 @@ export async function GET(
     })
   }
 
-  // Main invoice banner.
+  // Main quotation banner.
   page.drawRectangle({
     x: left,
     y: 682,
@@ -221,28 +220,28 @@ export async function GET(
     height: 48,
     color: colors.brand,
   })
-  page.drawText(isReceipt ? "RECEIPT" : "INVOICE", {
+  page.drawText("QUOTATION", {
     x: left + 16,
     y: 699,
     size: 18,
     font: fontBold,
     color: colors.accent,
   })
-  page.drawText(`${isReceipt ? "Receipt" : "Invoice"} #: ${invoice.invoice_number}`, {
+  page.drawText(`Quotation #: ${quotation.quotation_number}`, {
     x: 350,
     y: 705,
     size: 11,
     font: fontBold,
     color: colors.accent,
   })
-  page.drawText(`Date: ${invoice.date}`, {
+  page.drawText(`Date: ${quotation.date}`, {
     x: 350,
     y: 690,
     size: 10,
     font,
     color: colors.accent,
   })
-  page.drawText(`${isReceipt ? "Type" : "Status"}: ${statusText}`, {
+  page.drawText(`Status: ${statusText}`, {
     x: 455,
     y: 690,
     size: 10,
@@ -250,7 +249,7 @@ export async function GET(
     color: colors.accent,
   })
 
-  // Bill-to card.
+  // Quote-for card.
   page.drawRectangle({
     x: left,
     y: 604,
@@ -260,7 +259,7 @@ export async function GET(
     borderWidth: 1,
     color: colors.soft,
   })
-  page.drawText(isReceipt ? "Received From" : "Bill To", {
+  page.drawText("Quotation For", {
     x: left + 12,
     y: 646,
     size: 11,
@@ -293,7 +292,7 @@ export async function GET(
     })
   }
 
-  // Quick summary card.
+  // Validity card.
   page.drawRectangle({
     x: 315,
     y: 604,
@@ -303,21 +302,21 @@ export async function GET(
     borderWidth: 1,
     color: rgb(1, 1, 1),
   })
-  page.drawText(isReceipt ? "Receipt Summary" : "Payment Summary", {
+  page.drawText("Quotation Summary", {
     x: 327,
     y: 646,
     size: 11,
     font: fontBold,
     color: colors.brand,
   })
-  page.drawText(`Paid: ${money(invoice.paid_amount)}`, {
+  page.drawText(`Valid Until: ${quotation.valid_until ?? "—"}`, {
     x: 327,
     y: 628,
     size: 10,
     font,
     color: colors.text,
   })
-  page.drawText(`Remaining: ${money(invoice.remaining_balance)}`, {
+  page.drawText(`Total: ${money(quotation.total_amount)}`, {
     x: 327,
     y: 612,
     size: 10,
@@ -333,7 +332,7 @@ export async function GET(
     height: 26,
     color: colors.brandDark,
   })
-  page.drawText(isReceipt ? "Description" : "Item", {
+  page.drawText("Item", {
     x: left + 10,
     y: startY + 9,
     size: 10,
@@ -347,14 +346,14 @@ export async function GET(
     font: fontBold,
     color: colors.accent,
   })
-  page.drawText(isReceipt ? "Amount" : "Price", {
+  page.drawText("Price", {
     x: 390,
     y: startY + 9,
     size: 10,
     font: fontBold,
     color: colors.accent,
   })
-  page.drawText(isReceipt ? "Line Total" : "Total", {
+  page.drawText("Total", {
     x: 495,
     y: startY + 9,
     size: 10,
@@ -363,7 +362,7 @@ export async function GET(
   })
 
   let y = startY - 18
-  const rows = (items ?? []) as InvoiceItemRow[]
+  const rows = (items ?? []) as QuotationItemRow[]
   rows.slice(0, 12).forEach((item, index) => {
     if (index % 2 === 0) {
       page.drawRectangle({
@@ -407,54 +406,51 @@ export async function GET(
 
   const summaryTop = y - 14
 
+  // Payment terms + notes card.
   page.drawRectangle({
     x: left,
-    y: summaryTop - 84,
+    y: summaryTop - 116,
     width: 250,
-    height: 84,
+    height: 116,
     borderColor: colors.border,
     borderWidth: 1,
     color: colors.soft,
   })
-  page.drawText(isReceipt ? "Receipt Notes" : "Notes", {
+  page.drawText("Payment Terms", {
     x: left + 12,
     y: summaryTop - 16,
     size: 10,
     font: fontBold,
     color: colors.brand,
   })
-  page.drawText(
-    invoice.notes ||
-      (isReceipt
-        ? "This receipt confirms payment received for the invoice above."
-        : "No additional notes."),
-    {
+  page.drawText(quotation.payment_terms || "Not specified.", {
     x: left + 12,
-    y: summaryTop - 34,
+    y: summaryTop - 32,
     size: 9,
     font,
     color: colors.text,
     maxWidth: 226,
     lineHeight: 12,
   })
-  if (!isReceipt && invoice.payment_terms) {
-    page.drawText("Payment Terms", {
+  page.drawText("Notes", {
+    x: left + 12,
+    y: summaryTop - 70,
+    size: 10,
+    font: fontBold,
+    color: colors.brand,
+  })
+  page.drawText(
+    quotation.notes || "This quotation is not an invoice and is valid until the date shown.",
+    {
       x: left + 12,
-      y: summaryTop - 58,
-      size: 10,
-      font: fontBold,
-      color: colors.brand,
-    })
-    page.drawText(String(invoice.payment_terms), {
-      x: left + 12,
-      y: summaryTop - 72,
+      y: summaryTop - 86,
       size: 9,
       font,
       color: colors.text,
       maxWidth: 226,
       lineHeight: 12,
-    })
-  }
+    }
+  )
 
   page.drawRectangle({
     x: 332,
@@ -465,58 +461,56 @@ export async function GET(
     borderWidth: 1,
     color: rgb(1, 1, 1),
   })
-  page.drawText(isReceipt ? "Invoice Total" : "Subtotal", {
+  page.drawText("Subtotal", {
     x: 344,
     y: summaryTop - 16,
     size: 10,
     font,
     color: colors.text,
   })
-  page.drawText(money(isReceipt ? invoice.total_amount : invoice.subtotal), {
+  page.drawText(money(quotation.subtotal), {
     x: 488,
     y: summaryTop - 16,
     size: 10,
     font,
     color: colors.text,
   })
-  page.drawText(isReceipt ? "Amount Paid" : "Discount", {
+  page.drawText("Discount", {
     x: 344,
     y: summaryTop - 34,
     size: 10,
     font,
     color: colors.text,
   })
-  page.drawText(money(isReceipt ? invoice.paid_amount : invoice.discount), {
+  page.drawText(money(quotation.discount), {
     x: 488,
     y: summaryTop - 34,
     size: 10,
     font,
     color: colors.text,
   })
-  page.drawText(isReceipt ? "Remaining" : "VAT", {
+  page.drawText("VAT", {
     x: 344,
     y: summaryTop - 52,
     size: 10,
     font,
     color: colors.text,
   })
-  page.drawText(money(isReceipt ? invoice.remaining_balance : invoice.vat_amount), {
+  page.drawText(money(quotation.vat_amount), {
     x: 488,
     y: summaryTop - 52,
     size: 10,
     font,
     color: colors.text,
   })
-  page.drawText(isReceipt ? "Status" : "Delivery", {
+  page.drawText("Delivery", {
     x: 344,
     y: summaryTop - 70,
     size: 10,
     font,
     color: colors.text,
   })
-  page.drawText(
-    isReceipt ? statusText : money(invoice.delivery_cost),
-    {
+  page.drawText(money(quotation.delivery_cost), {
     x: 488,
     y: summaryTop - 70,
     size: 10,
@@ -530,14 +524,14 @@ export async function GET(
     height: 24,
     color: colors.brand,
   })
-  page.drawText(isReceipt ? "Receipt Total" : "Total", {
+  page.drawText("Quotation Total", {
     x: 346,
     y: summaryTop - 98,
     size: 12,
     font: fontBold,
     color: colors.accent,
   })
-  page.drawText(money(invoice.total_amount), {
+  page.drawText(money(quotation.total_amount), {
     x: 484,
     y: summaryTop - 98,
     size: 12,
@@ -552,7 +546,7 @@ export async function GET(
     height: 18,
     color: colors.brandDark,
   })
-  page.drawText("Thank you for your business.", {
+  page.drawText("Thank you for the opportunity to quote.", {
     x: left,
     y: 30,
     size: 9,
@@ -571,7 +565,7 @@ export async function GET(
   return new NextResponse(Buffer.from(pdfBytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `${shouldDownload ? "attachment" : "inline"}; filename="${invoice.invoice_number}-${template}.pdf"`,
+      "Content-Disposition": `${shouldDownload ? "attachment" : "inline"}; filename="${quotation.quotation_number}-quotation.pdf"`,
       "Cache-Control": "no-store",
     },
   })

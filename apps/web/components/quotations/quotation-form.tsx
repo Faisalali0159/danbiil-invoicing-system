@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
@@ -23,7 +23,7 @@ import {
 } from "@workspace/ui/components/table"
 import { Plus, Trash2 } from "lucide-react"
 import type { Customer, Product } from "@/types/database"
-import { createInvoice, updateInvoice } from "@/lib/actions/invoices"
+import { createQuotation, updateQuotation } from "@/lib/actions/quotations"
 import { calculateVat, formatCurrency } from "@/lib/utils/finance"
 import { onSelectValue } from "@/lib/utils/select"
 
@@ -34,44 +34,50 @@ type LineItem = {
   cost_price: number
 }
 
-type InitialInvoice = {
+type InitialQuotation = {
   id: string
   customer_id: string
   date: string
+  valid_until: string | null
   discount: number
   delivery_cost: number
-  paid_amount: number
   payment_terms: string | null
   notes: string | null
   items: LineItem[]
 }
 
-export function InvoiceForm({
+export function QuotationForm({
   customers,
   products,
   vatPercentage,
   mode = "create",
-  initialInvoice,
+  initialQuotation,
 }: {
   customers: Customer[]
   products: Product[]
   vatPercentage: number
   mode?: "create" | "edit"
-  initialInvoice?: InitialInvoice
+  initialQuotation?: InitialQuotation
 }) {
   const router = useRouter()
-  const [customerId, setCustomerId] = useState(initialInvoice?.customer_id ?? "")
+  const [customerId, setCustomerId] = useState(
+    initialQuotation?.customer_id ?? ""
+  )
   const [date, setDate] = useState(
-    initialInvoice?.date ?? new Date().toISOString().split("T")[0]
+    initialQuotation?.date ?? new Date().toISOString().split("T")[0]
   )
-  const [discount, setDiscount] = useState(initialInvoice?.discount ?? 0)
-  const [deliveryCost, setDeliveryCost] = useState(initialInvoice?.delivery_cost ?? 0)
-  const [paidAmount, setPaidAmount] = useState(initialInvoice?.paid_amount ?? 0)
+  const [validUntil, setValidUntil] = useState(
+    initialQuotation?.valid_until ?? ""
+  )
+  const [discount, setDiscount] = useState(initialQuotation?.discount ?? 0)
+  const [deliveryCost, setDeliveryCost] = useState(
+    initialQuotation?.delivery_cost ?? 0
+  )
   const [paymentTerms, setPaymentTerms] = useState(
-    initialInvoice?.payment_terms ?? ""
+    initialQuotation?.payment_terms ?? ""
   )
-  const [notes, setNotes] = useState(initialInvoice?.notes ?? "")
-  const [items, setItems] = useState<LineItem[]>(initialInvoice?.items ?? [])
+  const [notes, setNotes] = useState(initialQuotation?.notes ?? "")
+  const [items, setItems] = useState<LineItem[]>(initialQuotation?.items ?? [])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -82,15 +88,9 @@ export function InvoiceForm({
   const afterDiscount = subtotal - discount
   const vatAmount = calculateVat(afterDiscount, vatPercentage)
   const total = afterDiscount + vatAmount + deliveryCost
-  const canEditPaidAmount = mode === "create"
-
-  const productOptions = useMemo(
-    () => products.filter((p) => p.quantity > 0),
-    [products]
-  )
 
   function addItem() {
-    const first = productOptions[0]
+    const first = products[0]
     if (!first) return
     setItems([
       ...items,
@@ -132,35 +132,35 @@ export function InvoiceForm({
     const payload = {
       customer_id: customerId,
       date,
+      valid_until: validUntil || undefined,
       discount,
       vat_percentage: vatPercentage,
       delivery_cost: deliveryCost,
-      paid_amount: paidAmount,
       payment_terms: paymentTerms,
       notes,
       items,
     }
     const result =
-      mode === "edit" && initialInvoice
-        ? await updateInvoice({
-            id: initialInvoice.id,
+      mode === "edit" && initialQuotation
+        ? await updateQuotation({
+            id: initialQuotation.id,
             ...payload,
           })
-        : await createInvoice(payload)
+        : await createQuotation(payload)
     setLoading(false)
     if (result.error) {
       setError(result.error)
       return
     }
     const createdId = "id" in result ? result.id : undefined
-    const invoiceId = mode === "edit" ? initialInvoice?.id : createdId
-    router.push(invoiceId ? `/invoices/${invoiceId}` : "/invoices")
+    const quotationId = mode === "edit" ? initialQuotation?.id : createdId
+    router.push(quotationId ? `/quotations/${quotationId}` : "/quotations")
     router.refresh()
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6 p-4 md:p-6">
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <div className="grid gap-2">
           <Label>Date *</Label>
           <Input
@@ -184,20 +184,12 @@ export function InvoiceForm({
           </Select>
         </div>
         <div className="grid gap-2">
-          <Label>Paid Amount</Label>
+          <Label>Valid Until</Label>
           <Input
-            type="number"
-            min="0"
-            step="0.01"
-            value={paidAmount}
-            disabled={!canEditPaidAmount}
-            onChange={(e) => setPaidAmount(Number(e.target.value))}
+            type="date"
+            value={validUntil}
+            onChange={(e) => setValidUntil(e.target.value)}
           />
-          {!canEditPaidAmount && (
-            <p className="text-xs text-muted-foreground">
-              To change paid amount, record a payment in the Payments page.
-            </p>
-          )}
         </div>
       </div>
 
@@ -231,7 +223,7 @@ export function InvoiceForm({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {productOptions.map((p) => (
+                      {products.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.name} ({p.quantity} in stock)
                         </SelectItem>
@@ -340,7 +332,7 @@ export function InvoiceForm({
               : "Creating..."
             : mode === "edit"
               ? "Save Changes"
-              : "Create Invoice"}
+              : "Create Quotation"}
         </Button>
       </div>
 

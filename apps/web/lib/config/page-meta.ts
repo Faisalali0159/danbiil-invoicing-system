@@ -3,6 +3,10 @@ export const pageMeta: Record<string, { title: string; description?: string }> =
     title: "Dashboard",
     description: "Business overview and key metrics",
   },
+  "/quotations": {
+    title: "Quotations",
+    description: "Price quotes and proposals",
+  },
   "/invoices": {
     title: "Invoices",
     description: "Sales invoices and receipts",
@@ -55,6 +59,8 @@ export const pageMeta: Record<string, { title: string; description?: string }> =
 
 export function getPageMeta(pathname: string) {
   if (pageMeta[pathname]) return pageMeta[pathname]
+  if (pathname.startsWith("/quotations/new"))
+    return { title: "New Quotation", description: "Create a price quotation" }
   if (pathname.startsWith("/invoices/new"))
     return { title: "New Invoice", description: "Create a sales invoice" }
   if (pathname.startsWith("/purchases/new"))

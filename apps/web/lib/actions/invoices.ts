@@ -24,6 +24,7 @@ export async function createInvoice(data: {
   vat_percentage?: number
   delivery_cost?: number
   paid_amount?: number
+  payment_terms?: string
   notes?: string
   items: InvoiceLine[]
 }) {
@@ -88,6 +89,7 @@ export async function createInvoice(data: {
       paid_amount: paidAmount,
       remaining_balance: remaining,
       payment_status: paymentStatus,
+      payment_terms: data.payment_terms || null,
       notes: data.notes || null,
       created_by: user?.id ?? null,
     })
@@ -172,6 +174,7 @@ export async function updateInvoice(data: {
   vat_percentage?: number
   delivery_cost?: number
   paid_amount?: number
+  payment_terms?: string
   notes?: string
   items: InvoiceLine[]
 }) {
@@ -261,6 +264,7 @@ export async function updateInvoice(data: {
       paid_amount: paidAmount,
       remaining_balance: remaining,
       payment_status: paymentStatus,
+      payment_terms: data.payment_terms || null,
       notes: data.notes || null,
     })
     .eq("id", data.id)

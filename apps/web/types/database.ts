@@ -30,6 +30,14 @@ export type DocumentType =
   | "product_image"
   | "logo"
 
+export type QuotationStatus =
+  | "draft"
+  | "sent"
+  | "accepted"
+  | "rejected"
+  | "expired"
+  | "converted"
+
 export interface Profile {
   id: string
   full_name: string
@@ -101,11 +109,43 @@ export interface Invoice {
   paid_amount: number
   remaining_balance: number
   payment_status: PaymentStatus
+  payment_terms: string | null
+  quotation_id: string | null
   notes: string | null
   pdf_url: string | null
   created_by: string | null
   created_at: string
   updated_at: string
+}
+
+export interface Quotation {
+  id: string
+  quotation_number: string
+  customer_id: string
+  date: string
+  valid_until: string | null
+  subtotal: number
+  discount: number
+  vat_amount: number
+  delivery_cost: number
+  total_amount: number
+  status: QuotationStatus
+  payment_terms: string | null
+  notes: string | null
+  converted_invoice_id: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface QuotationItem {
+  id: string
+  quotation_id: string
+  product_id: string
+  quantity: number
+  selling_price: number
+  cost_price: number
+  total: number
 }
 
 export interface InvoiceItem {

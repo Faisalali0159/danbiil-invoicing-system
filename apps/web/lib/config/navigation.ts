@@ -3,6 +3,7 @@ import {
   BarChart3,
   Box,
   CreditCard,
+  FileSpreadsheet,
   FileText,
   LayoutDashboard,
   Package,
@@ -23,6 +24,7 @@ export interface NavItem {
 
 export const mainNav: NavItem[] = [
   { title: "Dashboard", href: "/", icon: LayoutDashboard },
+  { title: "Quotations", href: "/quotations", icon: FileSpreadsheet },
   { title: "Invoices", href: "/invoices", icon: FileText },
   { title: "Customers", href: "/customers", icon: Users },
   { title: "Products", href: "/products", icon: Package },

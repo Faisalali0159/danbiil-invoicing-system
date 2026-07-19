@@ -45,6 +45,7 @@ export default async function EditInvoicePage({
         discount: Number(invoice.discount),
         delivery_cost: Number(invoice.delivery_cost),
         paid_amount: Number(invoice.paid_amount),
+        payment_terms: invoice.payment_terms,
         notes: invoice.notes,
         items: (itemsResult.data ?? []).map((item) => ({
           product_id: item.product_id,

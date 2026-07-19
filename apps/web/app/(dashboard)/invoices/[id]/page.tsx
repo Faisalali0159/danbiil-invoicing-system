@@ -144,8 +144,13 @@ export default async function InvoiceDetailsPage({
           <p>VAT: {formatCurrency(invoice.vat_amount)}</p>
           <p>Delivery: {formatCurrency(invoice.delivery_cost)}</p>
         </div>
+        {invoice.payment_terms && (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Payment Terms: {invoice.payment_terms}
+          </p>
+        )}
         {invoice.notes && (
-          <p className="mt-3 text-sm text-muted-foreground">Notes: {invoice.notes}</p>
+          <p className="mt-2 text-sm text-muted-foreground">Notes: {invoice.notes}</p>
         )}
       </div>
     </div>
